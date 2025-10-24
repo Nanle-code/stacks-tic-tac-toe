@@ -5,8 +5,8 @@ authors = []
 telemetry = false
 cache_dir = './.cache'
 requirements = []
-[contracts.tic-tac-toe]
-path = 'contracts/tic-tac-toe.clar'
+[contracts.tic-tac-toev3]
+path = 'contracts/tic-tac-toev3.clar'
 clarity_version = 3
 epoch = 3.0
 [repl.analysis]

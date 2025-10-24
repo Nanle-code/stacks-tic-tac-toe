@@ -11,8 +11,12 @@ import {
   UIntCV,
 } from "@stacks/transactions";
 
-const CONTRACT_ADDRESS = "ST3P49R8XXQWG69S66MZASYPTTGNDKK0WW32RRJDN";
-const CONTRACT_NAME = "tic-tac-toe";
+const CONTRACT_ADDRESS = "ST1ASQH73Y0HWBRB4NM5RTE148YSYG8WYN2EPGCRN";
+const CONTRACT_NAME = "tic-tac-toev3";
+
+// NEW: Timeout constant (24 hours in blocks, ~10 second blocks)
+// For testing purposes, we can set this to a lower value like 10 blocks
+export const TIMEOUT_BLOCKS = 10;
 
 type GameCV = {
   "player-one": PrincipalCV;
@@ -21,6 +25,7 @@ type GameCV = {
   "bet-amount": UIntCV;
   board: ListCV<UIntCV>;
   winner: OptionalCV<PrincipalCV>;
+  "last-move-block": UIntCV;  // NEW
 };
 
 export type Game = {
@@ -31,6 +36,14 @@ export type Game = {
   "bet-amount": number;
   board: number[];
   winner: string | null;
+  "last-move-block": number; // NEW
+};
+
+// NEW: Type for cancel check response
+export type CancelCheckResponse = {
+  canCancel: boolean;
+  blocksUntilTimeout: number;
+  blocksPassed: number;
 };
 
 export enum Move {
@@ -145,4 +158,59 @@ export async function play(gameId: number, moveIndex: number, move: Move) {
   };
 
   return txOptions;
+}
+
+// NEW: Check if a game can be cancelled due to timeout
+export async function canCancelGame(
+  gameId: number
+): Promise<CancelCheckResponse | null> {
+  try {
+    const response = await fetchCallReadOnlyFunction({
+      contractAddress: CONTRACT_ADDRESS,
+      contractName: CONTRACT_NAME,
+      functionName: "can-cancel-game",
+      functionArgs: [uintCV(gameId)],
+      senderAddress: CONTRACT_ADDRESS,
+      network: STACKS_TESTNET,
+    });
+
+    const responseCV = response as any;
+    
+    if (responseCV.type === "error") return null;
+    
+    const value = responseCV.value.value;
+    
+    return {
+      canCancel: cvToValue(value["can-cancel"]),
+      blocksUntilTimeout: parseInt(value["blocks-until-timeout"].value.toString()),
+      blocksPassed: parseInt(value["blocks-passed"].value.toString()),
+    };
+  } catch (error) {
+    console.error("Error checking cancel status:", error);
+    return null;
+  }
+}
+
+// NEW: Cancel game due to timeout
+export async function cancelGameTimeout(gameId: number) {
+  const txOptions = {
+    contractAddress: CONTRACT_ADDRESS,
+    contractName: CONTRACT_NAME,
+    functionName: "cancel-game-timeout",
+    functionArgs: [uintCV(gameId)],
+  };
+
+  return txOptions;
+}
+
+// NEW: Helper to convert blocks to approximate time
+export function blocksToTime(blocks: number): string {
+  const seconds = blocks * 10; // ~10 seconds per block
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
 }

@@ -1,4 +1,4 @@
-import { createNewGame, joinGame, Move, play } from "@/lib/contract";
+import { createNewGame, joinGame, Move, play, cancelGameTimeout } from "@/lib/contract";
 import { getStxBalance } from "@/lib/stx-utils";
 import {
   AppConfig,
@@ -123,6 +123,31 @@ export function useStacks() {
     }
   }
 
+  // NEW: Handle cancel game timeout
+  async function handleCancelGameTimeout(gameId: number) {
+    if (typeof window === "undefined") return;
+
+    try {
+      if (!userData) throw new Error("User not connected");
+      
+      const txOptions = await cancelGameTimeout(gameId);
+      
+      await openContractCall({
+        ...txOptions,
+        appDetails,
+        onFinish: (data) => {
+          console.log(data);
+          window.alert("Game cancelled successfully! Funds returned to your wallet.");
+        },
+        postConditionMode: PostConditionMode.Allow,
+      });
+    } catch (_err) {
+      const err = _err as Error;
+      console.error(err);
+      window.alert(err.message);
+    }
+  }
+
   useEffect(() => {
     if (userSession.isSignInPending()) {
       userSession.handlePendingSignIn().then((userData) => {
@@ -150,5 +175,6 @@ export function useStacks() {
     handleCreateGame,
     handleJoinGame,
     handlePlayGame,
+    handleCancelGameTimeout, // NEW
   };
 }
